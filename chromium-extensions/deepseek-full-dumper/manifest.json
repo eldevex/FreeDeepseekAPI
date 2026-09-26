@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "DeepSeek Full Dumper",
+  "version": "2.0",
+  "description": "Dumps ALL cookies, storage, and intercepted network requests from chat.deepseek.com",
+  "permissions": ["cookies", "storage", "tabs", "scripting"],
+  "host_permissions": [
+    "https://chat.deepseek.com/*",
+    "https://*.deepseek.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["injector.js"],
+      "run_at": "document_start",
+      "world": "MAIN"
+    },
+    {
+      "matches": ["https://chat.deepseek.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_start",
+      "world": "ISOLATED"
+    }
+  ],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_popup": "popup.html" }
+}
