@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>FreeDeepseekAPI в Termux + Kai Skill — Полная инструкция</title>
+<title>FreeDeepseekAPI в Termux + Kai 9000 — Полная инструкция</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   :root {
@@ -176,15 +176,15 @@
 <body>
 
 <header>
-  <h1>🔓 FreeDeepseekAPI в Termux + Kai Skill</h1>
-  <p>Полная инструкция: установка, авторизация через расширение, запуск OpenAI-API и подключение skill <code>/reset</code> к Kai 9000 через GitHub.</p>
+  <h1>🔓 FreeDeepseekAPI в Termux + Kai 9000</h1>
+  <p>Полная инструкция: установка, авторизация через расширение Chrome, запуск OpenAI-совместимого API и подключение навыка в Kai 9000.</p>
   <div class="badges">
     <span class="badge">DeepSeek Web Chat</span>
     <span class="badge">OpenAI API</span>
     <span class="badge">Anthropic API</span>
     <span class="badge">Streaming</span>
     <span class="badge">Tool Calling</span>
-    <span class="badge kai">Kai 9000 Skill</span>
+    <span class="badge kai">Kai 9000</span>
   </div>
 </header>
 
@@ -201,9 +201,8 @@
     <li><a href="#s6">Запуск сервера</a></li>
     <li><a href="#s7">Использование API</a></li>
     <li><a href="#s8">Управление сервером</a></li>
-    <li><a href="#s9">Патч: авто-сброс при переполнении контекста</a></li>
-    <li><a href="#s10">Skill /reset для Kai 9000</a></li>
-    <li><a href="#s11">Возможные проблемы</a></li>
+    <li><a href="#s9">Навык в Kai 9000</a></li>
+    <li><a href="#s10">Возможные проблемы</a></li>
   </ol>
 </nav>
 
@@ -364,84 +363,55 @@ npm start</code></pre>
   </div>
 </section>
 
-<!-- ШАГ 9 -->
-<section id="s9">
-  <h2><span class="num">9</span> Патч: авто-сброс при переполнении контекста</h2>
-  <p>По умолчанию FreeDeepseekAPI при ошибке <code>context_length_exceeded</code> пытается ретраить запрос <b>в тот же чат</b>, что бесполезно (контекст на сервере DeepSeek уже разросся). Патч заставляет сбросить сессию и создать новый чат — с сохранением локальной истории.</p>
-
-  <h3>9.1 Бэкап</h3>
-  <pre><code>cp ~/FreeDeepseekAPI/server.js ~/FreeDeepseekAPI/server.js.bak</code></pre>
-
-  <h3>9.2 Правка</h3>
-  <pre><code>nano ~/FreeDeepseekAPI/server.js</code></pre>
-  <p>Через <code>Ctrl+W</code> найдите строку:</p>
-  <pre><code>const contextTooLong = isContextTooLongError(modelError);</code></pre>
-  <p>Сразу после неё вставьте:</p>
-  <pre><code>                // При переполнении контекста сбрасываем remote-чат (session.id=null),
-                // следующий retry создаст новый. Локальная история агента сохраняется.
-                if (contextTooLong &amp;&amp; session.id) {
-                    console.log(`${agentTag} context too long — resetting remote chat (msg#${session.messageCount} -> new)`);
-                    session.id = null;
-                    session.parentMessageId = null;
-                    session.createdAt = null;
-                    session.messageCount = 0;
-                    session.deltaMsgCount = 0;
-                    session.deltaBoundary = null;
-                    session.deltaPrefixHash = null;
-                    session.deltaToolNames = null;
-                    session.repairHash = null;
-                    session.repairAt = 0;
-                    session.repairCount = 0;
-                    persistSessions();
-                }</code></pre>
-  <p>Сохраните: <b>Ctrl+O → Enter → Ctrl+X</b>.</p>
-
-  <h3>9.3 Перезапуск</h3>
-  <pre><code>pkill -f "node server.js"
-cd ~/FreeDeepseekAPI
-NON_INTERACTIVE=1 npm start</code></pre>
-  <div class="callout ok">
-    <b>После патча</b> длинные диалоги больше не упираются в лимит: при переполнении контекста создаётся новый чат DeepSeek, локальная память не теряется.
+<!-- ШАГ 9 — KAI -->
+<section id="s9" class="kai-section">
+  <h2><span class="num">9</span> Навык в Kai 9000</h2>
+  <p>В приложении <b>Kai 9000</b> откройте раздел <b>Инструменты → Навыки</b>, нажмите <b>Добавить навык</b> и вставьте URL репозитория:</p>
+  <pre><code>https://github.com/eldevex/FreeDeepseekAPI/</code></pre>
+  <p>Kai сам найдёт <code>SKILL.md</code> в репозитории и подключит навык.</p>
+  <div class="callout kai">
+    После установки в чате Kai можно писать <code>/reset</code> или просто «начни новый чат DeepSeek» — навык вызовет <code>POST /reset-session</code> на локальном прокси и следующий запрос уйдёт в новый чат.
   </div>
 </section>
 
-<!-- ШАГ 10 — KAI SKILL -->
-<section id="s10" class="kai-section">
-  <h2><span class="num">10</span> Skill /reset для Kai 9000</h2>
-  <p>Kai 9000 — это AI-агент с sandbox-окружением, который умеет устанавливать <b>навыки (skills)</b> прямо из GitHub-репозитория по URL. Skill — это файл <code>SKILL.md</code> с YAML frontmatter и инструкциями: Kai читает его и учится вызывать shell-команды по триггерам-фразам или по команде <code>/&lt;name&gt;</code>.</p>
-
-  <div class="callout kai">
-    <b>Что получится:</b> вы пишете в чат Kai «начни новый чат DeepSeek» или <code>/reset</code>, и Kai сам вызывает <code>POST http://localhost:9655/reset-session</code> — сессия сбрасывается, следующий запрос идёт в новый чат DeepSeek.
+<!-- ШАГ 10 -->
+<section id="s10">
+  <h2><span class="num">10</span> Возможные проблемы</h2>
+  <table>
+    <tr><th>Проблема</th><th>Решение</th></tr>
+    <tr>
+      <td><code>deepseek-auth.json</code> не найден</td>
+      <td>Убедитесь, что файл скопирован в корень проекта: <code>ls ~/FreeDeepseekAPI/deepseek-auth.json</code></td>
+    </tr>
+    <tr>
+      <td>Ошибка <code>401</code></td>
+      <td>Токен истёк. Получите свежий auth-файл через расширение и скопируйте заново.</td>
+    </tr>
+    <tr>
+      <td><code>npm start</code> зависает на меню</td>
+      <td>Используйте <code>NON_INTERACTIVE=1 npm start</code>.</td>
+    </tr>
+    <tr>
+      <td>Порт 9655 занят</td>
+      <td><code>pkill -f "node server.js"</code>, затем запустить снова.</td>
+    </tr>
+    <tr>
+      <td>Сообщения уходят в старый чат</td>
+      <td>Сбросьте сессию: <code>curl -X POST "http://localhost:9655/reset-session?agent=all"</code></td>
+    </tr>
+  </table>
+  <div class="callout ok">
+    <b>Готово!</b> Если что-то не заработает — проверьте <code>npm start</code> в переднем плане, там будет видна причина.
   </div>
+</section>
 
-  <h3>10.1 Создайте папку skill в репозитории</h3>
-  <p>Kai сам ищет файл <code>SKILL.md</code> в репозитории. Положим его в отдельную папку:</p>
-  <pre><code>cd ~/FreeDeepseekAPI
-mkdir -p skill
-nano skill/SKILL.md</code></pre>
+</main>
 
-  <h3>10.2 Вставьте содержимое</h3>
-  <pre><code>---
-name: reset
-description: Сбросить сессию FreeDeepseekAPI и начать новый чат DeepSeek. Вызывать при фразах — новый чат, начни новый чат, создай новый чат, давай новый чат, начнём заново, начни с нуля, начни с чистого листа, сбрось сессию, сбрось чат, сбрось DeepSeek, сбрось контекст, очисти сессию, очисти чат, обнули чат, обнули контекст, забудь контекст, перезапусти сессию, reset deepseek, reset chat, start fresh, new chat, deepseek stuck, мы застряли, сообщения идут в старый чат. Также при ошибке context_length_exceeded.
----
+<a href="#" class="top" title="Наверх">↑</a>
 
-# Reset DeepSeek Session
+<footer>
+  Инструкция для Termux · FreeDeepseekAPI (форк eldevex) + Kai 9000 · 2026
+</footer>
 
-## Точные URL
-
-| Действие | Метод | URL |
-|---|---|---|
-| Список сессий | GET | `http://localhost:9655/v1/sessions` |
-| Сброс сессии | POST | `http://localhost:9655/reset-session?agent=&lt;id&gt;` |
-
-Путей `/v1/reset-session` и `/v1/sessions/reset` **не существует** — они дают 404.
-
-## Алгоритм
-
-Выполни через `execute_shell_command`, без рассуждений:
-
-### 1. Список сессий
-
-```sh
-curl -sS "http://localhost:9655/v1/sessions"
+</body>
+</html>
