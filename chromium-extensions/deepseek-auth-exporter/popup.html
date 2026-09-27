@@ -4,42 +4,39 @@
 <meta charset="utf-8">
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, 'Segoe UI', Roboto, sans-serif; }
-  body { width: 480px; padding: 14px; background: #14161c; color: #e0e0e0; font-size: 13px; }
+  body { width: 460px; padding: 14px; background: #14161c; color: #e0e0e0; font-size: 13px; }
   h1 { font-size: 15px; color: #4fc3f7; margin-bottom: 4px; }
   .sub { font-size: 11px; color: #888; margin-bottom: 10px; }
   .status { padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; font-size: 12px; }
   .ok { background:#1b5e2033; border:1px solid #2e7d32; color:#66bb6a; }
   .warn { background:#e6510033; border:1px solid #e65100; color:#ff9800; }
-  .err { background:#b71c1c33; border:1px solid #c62828; color:#ef5350; }
-  .fields { font-size: 11px; margin-bottom: 8px; line-height: 1.7; }
+  .fields { font-size: 11px; margin-bottom: 8px; line-height: 1.8; }
   .fields b { color: #7ee787; }
   .miss { color: #ef5350; }
   .btn-row { display:flex; gap:6px; margin-bottom:10px; }
   button { flex:1; padding:8px; border:none; border-radius:6px; cursor:pointer; font-size:12px; font-weight:600; }
-  .b1 { background:#1565c0; color:#fff; } .b1:hover { background:#1976d2; }
-  .b2 { background:#2e7d32; color:#fff; } .b2:hover { background:#388e3c; }
-  .b3 { background:#e65100; color:#fff; } .b3:hover { background:#ef6c00; }
+  .b2 { background:#2e7d32; color:#fff; }
+  .b3 { background:#e65100; color:#fff; }
   pre { background:#0b0d12; border:1px solid #2a2f3a; border-radius:4px; padding:10px;
         font:11px 'Courier New', monospace; color:#7ee787; white-space:pre-wrap;
-        word-break:break-all; max-height:280px; overflow:auto; }
+        word-break:break-all; max-height:260px; overflow:auto; }
   .hint { font-size:10px; color:#666; text-align:center; margin-top:8px; }
 </style>
 </head>
 <body>
   <h1>🔑 DeepSeek Auth Exporter</h1>
-  <div class="sub">Собирает токен, hif_* и cookie для FreeDeepseekAPI</div>
+  <div class="sub">Собирает token, hif_* и cookie для FreeDeepseekAPI</div>
 
   <div id="status" class="status warn">⏳ Собираю данные...</div>
   <div id="fields" class="fields"></div>
 
   <div class="btn-row">
-    <button id="btnCollect" class="b1">🔄 Собрать</button>
     <button id="btnCopy" class="b2">📋 Копировать</button>
     <button id="btnSave" class="b3">💾 Скачать</button>
   </div>
 
   <pre id="preview">{ }</pre>
-  <div class="hint">Если чего-то не хватает — перезагрузи вкладку chat.deepseek.com (F5), отправь сообщение в чате и нажми «Собрать»</div>
+  <div class="hint">Открой chat.deepseek.com → F5 → отправь сообщение → вернись сюда</div>
 
 <script src="popup.js"></script>
 </body>

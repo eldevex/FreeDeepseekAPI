@@ -1,68 +1,68 @@
 (function () {
-  const captured = { token: '', hif_leim: '', hif_dliq: '' };
+  const cap = {};
 
   function emit() {
-    window.postMessage({ __dsxCapture: true, captured: { ...captured } }, '*');
+    window.postMessage({ __dsx: true, ...cap }, "*");
   }
 
-  function recordHeaders(raw) {
-    if (!raw) return;
-    let h = raw;
+  function grab(h) {
+    if (!h) return;
     try {
-      if (h instanceof Headers) {
-        const o = {}; h.forEach((v, k) => o[k.toLowerCase()] = v); h = o;
-      } else if (Array.isArray(h)) {
-        const o = {}; h.forEach(([k, v]) => o[k.toLowerCase()] = v); h = o;
-      } else {
-        const o = {}; Object.keys(h).forEach(k => o[k.toLowerCase()] = h[k]); h = o;
-      }
+      const o = {};
+      if (h instanceof Headers) h.forEach((v, k) => o[k.toLowerCase()] = v);
+      else if (Array.isArray(h)) h.forEach(([k, v]) => o[k.toLowerCase()] = v);
+      else Object.keys(h).forEach(k => o[k.toLowerCase()] = h[k]);
+
       let changed = false;
-      const auth = h['authorization'];
-      if (auth && !captured.token) {
-        captured.token = String(auth).replace(/^Bearer\s+/i, '');
-        changed = true;
+      const auth = o["authorization"];
+      if (auth) {
+        const t = String(auth).replace(/^Bearer\s+/i, "");
+        if (t && t !== cap.token) { cap.token = t; changed = true; }
       }
-      if (h['x-hif-leim'] && captured.hif_leim !== h['x-hif-leim']) {
-        captured.hif_leim = h['x-hif-leim']; changed = true;
+      if (o["x-hif-leim"] && o["x-hif-leim"] !== cap.hif_leim) {
+        cap.hif_leim = o["x-hif-leim"]; changed = true;
       }
-      if (h['x-hif-dliq'] && captured.hif_dliq !== h['x-hif-dliq']) {
-        captured.hif_dliq = h['x-hif-dliq']; changed = true;
+      if (o["x-hif-dliq"] && o["x-hif-dliq"] !== cap.hif_dliq) {
+        cap.hif_dliq = o["x-hif-dliq"]; changed = true;
       }
       if (changed) emit();
     } catch (e) {}
   }
 
-  // --- fetch ---
-  const _fetch = window.fetch;
+  const _f = window.fetch;
   window.fetch = function (input, init) {
-    try {
-      const h = (init && init.headers) || (input && input.headers);
-      recordHeaders(h);
-    } catch (e) {}
-    return _fetch.apply(this, arguments);
+    try { grab((init && init.headers) || (input && input.headers)); } catch (e) {}
+    return _f.apply(this, arguments);
   };
 
-  // --- XHR ---
-  const _XHR = window.XMLHttpRequest;
-  function Wrapped() {
-    const xhr = new _XHR();
-    const _open = xhr.open;
-    const _send = xhr.send;
-    const _setHeader = xhr.setRequestHeader;
-    const _headers = {};
-    xhr.open = function () { return _open.apply(xhr, arguments); };
-    xhr.setRequestHeader = function (k, v) {
-      _headers[String(k).toLowerCase()] = v;
-      return _setHeader.apply(xhr, arguments);
-    };
-    xhr.send = function () {
-      try { recordHeaders(_headers); } catch (e) {}
-      return _send.apply(xhr, arguments);
-    };
-    return xhr;
+  const _X = window.XMLHttpRequest;
+  function W() {
+    const x = new _X();
+    const _o = x.open, _s = x.send, _sh = x.setRequestHeader;
+    const hs = {};
+    x.open = function () { return _o.apply(x, arguments); };
+    x.setRequestHeader = function (k, v) { hs[k.toLowerCase()] = v; return _sh.apply(x, arguments); };
+    x.send = function () { try { grab(hs); } catch (e) {} return _s.apply(x, arguments); };
+    return x;
   }
-  Wrapped.prototype = _XHR.prototype;
-  window.XMLHttpRequest = Wrapped;
+  W.prototype = _X.prototype;
+  window.XMLHttpRequest = W;
 
-  emit();
+  setTimeout(async () => {
+    if (cap.hif_dliq) return;
+    try {
+      const r = await _f.call(window, "https://hif-dliq.deepseek.com/query", {
+        credentials: "include",
+        headers: {
+          "x-client-bundle-id": "com.deepseek.chat",
+          "x-client-platform": "web",
+          "x-client-version": "2.5.0",
+          "accept": "*/*"
+        }
+      });
+      const j = await r.json();
+      const v = j && j.data && (j.data.biz_data && j.data.biz_data.value || j.data.value);
+      if (v) { cap.hif_dliq = v; emit(); }
+    } catch (e) {}
+  }, 3000);
 })();

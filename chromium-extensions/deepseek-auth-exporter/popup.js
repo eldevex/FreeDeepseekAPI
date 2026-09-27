@@ -1,61 +1,77 @@
 const $ = (id) => document.getElementById(id);
 
-function setStatus(text, cls) {
-  $('status').textContent = text;
-  $('status').className = 'status ' + cls;
+function readAuth() {
+  return new Promise((res) => chrome.storage.local.get("ds_auth", (r) => res(r.ds_auth || {})));
+}
+
+function readCookies() {
+  return new Promise((res) => chrome.cookies.getAll({ domain: "deepseek.com" }, (c) => res(c || [])));
+}
+
+async function buildJson() {
+  const stored = await readAuth();
+  const cookies = await readCookies();
+
+  const ds = cookies.find((c) => c.name === "ds_session_id");
+  const smidCookie = cookies.find((c) => c.name === "smidV2");
+
+  const smid = stored.smidV2 || (smidCookie ? smidCookie.value : "");
+  const parts = [];
+  if (ds) parts.push("ds_session_id=" + ds.value);
+  if (smid) parts.push("smidV2=" + smid);
+
+  return {
+    token: stored.token || "",
+    hif_dliq: stored.hif_dliq || "",
+    hif_leim: stored.hif_leim || "",
+    cookie: parts.join("; "),
+    wasmUrl: "https://fe-static.deepseek.com/chat/static/sha3_wasm_bg.7b9ca65ddd.wasm"
+  };
 }
 
 function renderFields(auth) {
   const rows = [
-    ['token',    auth.token],
-    ['hif_leim', auth.hif_leim],
-    ['hif_dliq', auth.hif_dliq],
-    ['cookie',   auth.cookie],
-    ['wasmUrl',  auth.wasmUrl]
+    ["token", auth.token],
+    ["hif_dliq", auth.hif_dliq],
+    ["hif_leim", auth.hif_leim],
+    ["cookie", auth.cookie]
   ];
-  $('fields').innerHTML = rows.map(([k, v]) => {
+  $("fields").innerHTML = rows.map(([k, v]) => {
     const ok = !!v;
-    const shown = ok
-      ? (v.length > 42 ? v.slice(0, 42) + '…' : v)
-      : '<span class="miss">пусто</span>';
-    return `<div>${ok ? '✅' : '<span class="miss">❌</span>'} <b>${k}</b>: ${shown}</div>`;
-  }).join('');
+    const shown = ok ? (v.length > 42 ? v.slice(0, 42) + "…" : v) : '<span class="miss">пусто</span>';
+    return '<div>' + (ok ? "✅" : "❌") + ' <b>' + k + '</b>: ' + shown + '</div>';
+  }).join("");
 }
 
-function render(auth, missing) {
-  $('preview').textContent = JSON.stringify(auth, null, 2);
+async function render() {
+  const auth = await buildJson();
+  $("preview").textContent = JSON.stringify(auth, null, 2);
   renderFields(auth);
-  if (!missing || missing.length === 0) {
-    setStatus('✅ Все ключевые поля собраны — можно скачивать', 'ok');
+  const missing = ["token", "hif_leim", "cookie"].filter((k) => !auth[k]);
+  if (missing.length === 0) {
+    $("status").textContent = "✅ Всё собрано — можно копировать или скачивать";
+    $("status").className = "status ok";
   } else {
-    setStatus('⚠️ Не хватает: ' + missing.join(', '), 'warn');
+    $("status").textContent = "⚠️ Не хватает: " + missing.join(", ") + ". Перезагрузи вкладку DeepSeek и отправь сообщение в чате.";
+    $("status").className = "status warn";
   }
 }
 
-function collect() {
-  setStatus('⏳ Собираю данные...', 'warn');
-  chrome.runtime.sendMessage({ action: 'collect' }, (r) => {
-    if (r && r.success) render(r.auth, r.missing);
-    else setStatus('❌ ' + (r?.error || 'Неизвестная ошибка'), 'err');
-  });
-}
-
-$('btnCollect').addEventListener('click', collect);
-
-$('btnCopy').addEventListener('click', () => {
-  navigator.clipboard.writeText($('preview').textContent).then(() => {
-    const b = $('btnCopy'); b.textContent = '✅ Скопировано';
-    setTimeout(() => b.textContent = '📋 Копировать', 1200);
+$("btnCopy").addEventListener("click", () => {
+  navigator.clipboard.writeText($("preview").textContent).then(() => {
+    $("btnCopy").textContent = "✅ Скопировано";
+    setTimeout(() => $("btnCopy").textContent = "📋 Копировать", 1200);
   });
 });
 
-$('btnSave').addEventListener('click', () => {
-  const blob = new Blob([$('preview').textContent + '\n'], { type: 'application/json' });
-  const a = document.createElement('a');
+$("btnSave").addEventListener("click", () => {
+  const blob = new Blob([$("preview").textContent + "\n"], { type: "application/json" });
+  const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = 'deepseek-auth.json';
+  a.download = "deepseek-auth.json";
   a.click();
   URL.revokeObjectURL(a.href);
 });
 
-collect();  // автосбор при открытии popup
+render();
+setInterval(render, 1000);

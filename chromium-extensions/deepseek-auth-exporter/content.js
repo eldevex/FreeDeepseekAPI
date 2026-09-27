@@ -1,80 +1,42 @@
-const captured = { token: '', hif_leim: '', hif_dliq: '' };
+function ls(k) { try { return localStorage.getItem(k) || ""; } catch (e) { return ""; } }
 
-window.addEventListener('message', (e) => {
+function updateStorage(patch) {
+  chrome.storage.local.get("ds_auth", (r) => {
+    const cur = r.ds_auth || {};
+    const next = Object.assign({}, cur, patch, { _updated: Date.now() });
+    chrome.storage.local.set({ ds_auth: next });
+  });
+}
+
+function readFromLS() {
+  const out = {};
+  try {
+    const ut = JSON.parse(ls("userToken") || "{}");
+    out.token = ut.value || "";
+  } catch (e) {}
+  try {
+    let v = JSON.parse(ls("hif_leim_cached") || '""');
+    if (typeof v === "string") v = JSON.parse(v);
+    out.hif_leim = v || "";
+  } catch (e) {}
+  try {
+    const s = ls("smidV2");
+    out.smidV2 = s ? (JSON.parse(s) || s) : "";
+  } catch (e) { out.smidV2 = ls("smidV2"); }
+  return out;
+}
+
+updateStorage(readFromLS());
+setTimeout(() => updateStorage(readFromLS()), 3000);
+setTimeout(() => updateStorage(readFromLS()), 8000);
+
+window.addEventListener("message", (e) => {
   if (e.source !== window) return;
   const d = e.data;
-  if (d && d.__dsxCapture && d.captured) {
-    Object.assign(captured, d.captured);
-  }
-});
-
-function ls(key) {
-  try { return localStorage.getItem(key) || ''; } catch (e) { return ''; }
-}
-
-function safeJson(str, fallback) {
-  try { return JSON.parse(str); } catch (e) { return fallback; }
-}
-
-// userToken = {"value":"+Xh3trs...","__version":"0"}
-function tokenFromLS() {
-  const raw = ls('userToken');
-  if (!raw) return '';
-  const j = safeJson(raw, null);
-  if (j && typeof j === 'object' && typeof j.value === 'string') return j.value;
-  return '';
-}
-
-// hif_leim_cached = "\"3Gsd...\""  (двойная JSON-сериализация)
-function hifLeimFromLS() {
-  const raw = ls('hif_leim_cached');
-  if (!raw) return '';
-  let v = safeJson(raw, raw);
-  if (typeof v === 'string') v = safeJson(v, v);
-  return typeof v === 'string' ? v : '';
-}
-
-// Запрос к hif-dliq.deepseek.com/query
-async function fetchHifDliq() {
-  try {
-    const r = await fetch('https://hif-dliq.deepseek.com/query', {
-      method: 'GET',
-      credentials: 'include',
-      headers: {
-        'x-client-bundle-id': 'com.deepseek.chat',
-        'x-client-platform': 'web',
-        'x-client-version': '2.5.0',
-        'x-client-locale': (navigator.language || 'en_US').replace('-', '_'),
-        'x-client-timezone-offset': String(-new Date().getTimezoneOffset() * 60),
-        'accept': '*/*'
-      }
-    });
-    const j = await r.json();
-    return (
-      (j && j.data && j.data.biz_data && j.data.biz_data.value) ||
-      (j && j.data && j.data.value) ||
-      ''
-    );
-  } catch (e) {
-    return '';
-  }
-}
-
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.action === 'getLocalData') {
-    (async () => {
-      const fetched = await fetchHifDliq();
-      sendResponse({
-        success: true,
-        data: {
-          token_ls: tokenFromLS(),
-          hif_leim_ls: hifLeimFromLS(),
-          hif_dliq_fetched: fetched,
-          smidV2_ls: ls('smidV2'),
-          captured: { ...captured }
-        }
-      });
-    })();
-    return true;
-  }
+  if (!d || !d.__dsx) return;
+  const patch = {};
+  if (d.token) patch.token = d.token;
+  if (d.hif_leim) patch.hif_leim = d.hif_leim;
+  if (d.hif_dliq) patch.hif_dliq = d.hif_dliq;
+  if (Object.keys(patch).length) updateStorage(patch);
 });
