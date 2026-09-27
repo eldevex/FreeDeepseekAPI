@@ -1,63 +1,65 @@
 (function () {
-  const MAX_BODY = 100000;
-  const captured = [];
+  const MAX_BODY = 20000;
+  const MAX_ENTRIES = 300;
+  const log = [];
 
   function truncate(s) {
-    if (typeof s !== 'string') return s;
-    return s.length > MAX_BODY ? s.slice(0, MAX_BODY) + '...[truncated]' : s;
+    if (typeof s !== "string") return s;
+    return s.length > MAX_BODY ? s.slice(0, MAX_BODY) + "...[truncated]" : s;
   }
 
   function headersToObj(h) {
     const out = {};
     try {
       if (!h) return out;
-      if (h instanceof Headers) h.forEach((v, k) => (out[k] = v));
-      else if (Array.isArray(h)) h.forEach(([k, v]) => (out[k] = v));
-      else Object.assign(out, h);
+      if (h instanceof Headers) h.forEach((v, k) => out[k.toLowerCase()] = v);
+      else if (Array.isArray(h)) h.forEach(([k, v]) => out[k.toLowerCase()] = v);
+      else Object.keys(h).forEach(k => out[k.toLowerCase()] = h[k]);
     } catch (e) {}
     return out;
   }
 
-  function push(entry) {
-    captured.push({ ...entry, ts: new Date().toISOString() });
-    if (captured.length > 500) captured.shift();
-    window.postMessage({ __dsx: true, type: 'capture', entry }, '*');
+  function interesting(url) {
+    return typeof url === "string" && (url.includes("deepseek") || url.includes("/api/"));
   }
 
-  const interesting = (url) =>
-    typeof url === 'string' &&
-    (url.includes('deepseek') || url.includes('/api/'));
+  function push(entry) {
+    entry.ts = new Date().toISOString();
+    log.push(entry);
+    if (log.length > MAX_ENTRIES) log.shift();
+    window.postMessage({ __dsx: "req", entry }, "*");
+  }
 
   // --- Hook fetch ---
-  const origFetch = window.fetch;
+  const _f = window.fetch;
   window.fetch = function (input, init) {
-    let url = '', method = 'GET', headers = {}, body = '';
+    let url = "", method = "GET", headers = {}, body = "";
     try {
-      url = typeof input === 'string' ? input : (input && input.url) || '';
-      method = (init && init.method) || (input && input.method) || 'GET';
+      url = typeof input === "string" ? input : (input && input.url) || "";
+      method = (init && init.method) || (input && input.method) || "GET";
       headers = headersToObj((init && init.headers) || (input && input.headers));
       let b = init && init.body;
-      if (b && typeof b !== 'string') {
+      if (b && typeof b !== "string") {
         try { b = JSON.stringify(b); } catch (e) { b = String(b); }
       }
-      body = truncate(b || '');
+      body = truncate(b || "");
       if (interesting(url)) {
-        push({ kind: 'fetch.request', url, method, headers, body });
+        push({ kind: "fetch.request", url, method, headers, body });
       }
     } catch (e) {}
 
-    const p = origFetch.apply(this, arguments);
-    p.then((res) => {
+    const p = _f.apply(this, arguments);
+    p.then(res => {
       try {
         if (interesting(url)) {
           const clone = res.clone();
-          clone.text().then((t) => {
+          clone.text().then(t => {
             push({
-              kind: 'fetch.response',
+              kind: "fetch.response",
               url,
               status: res.status,
               headers: headersToObj(res.headers),
-              body: truncate(t),
+              body: truncate(t)
             });
           }).catch(() => {});
         }
@@ -66,43 +68,28 @@
     return p;
   };
 
-  // --- Hook XMLHttpRequest ---
-  const OrigXHR = window.XMLHttpRequest;
-  function WrappedXHR() {
-    const xhr = new OrigXHR();
-    const _open = xhr.open;
-    const _send = xhr.send;
-    const _setHeader = xhr.setRequestHeader;
-    let _method, _url, _headers = {};
-
-    xhr.open = function (method, url) {
-      _method = method; _url = url;
-      return _open.apply(xhr, arguments);
-    };
-    xhr.setRequestHeader = function (k, v) {
-      _headers[k] = v;
-      return _setHeader.apply(xhr, arguments);
-    };
+  // --- Hook XHR ---
+  const _X = window.XMLHttpRequest;
+  function W() {
+    const xhr = new _X();
+    const _open = xhr.open, _send = xhr.send, _setHeader = xhr.setRequestHeader;
+    let method, url, headers = {};
+    xhr.open = function (m, u) { method = m; url = u; return _open.apply(xhr, arguments); };
+    xhr.setRequestHeader = function (k, v) { headers[k.toLowerCase()] = v; return _setHeader.apply(xhr, arguments); };
     xhr.send = function (body) {
       try {
-        if (interesting(_url)) {
+        if (interesting(url)) {
           let b = body;
-          if (b && typeof b !== 'string') {
+          if (b && typeof b !== "string") {
             try { b = JSON.stringify(b); } catch (e) { b = String(b); }
           }
-          push({
-            kind: 'xhr.request',
-            url: _url,
-            method: _method,
-            headers: _headers,
-            body: truncate(b || ''),
-          });
-          xhr.addEventListener('load', () => {
+          push({ kind: "xhr.request", url, method, headers, body: truncate(b || "") });
+          xhr.addEventListener("load", () => {
             push({
-              kind: 'xhr.response',
-              url: _url,
+              kind: "xhr.response",
+              url,
               status: xhr.status,
-              body: truncate(xhr.responseText || ''),
+              body: truncate(xhr.responseText || "")
             });
           });
         }
@@ -111,11 +98,6 @@
     };
     return xhr;
   }
-  WrappedXHR.prototype = OrigXHR.prototype;
-  window.XMLHttpRequest = WrappedXHR;
-
-  window.__dsxGetCaptured = () => captured;
-  window.__dsxClearCaptured = () => { captured.length = 0; };
-
-  window.postMessage({ __dsx: true, type: 'ready' }, '*');
+  W.prototype = _X.prototype;
+  window.XMLHttpRequest = W;
 })();

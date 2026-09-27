@@ -1,63 +1,86 @@
 const $ = (id) => document.getElementById(id);
 
-function setStatus(text, cls) {
-  $('status').textContent = text;
-  $('status').className = 'status ' + cls;
+function readDump() {
+  return new Promise((res) => chrome.storage.local.get("ds_dump", (r) => res(r.ds_dump || {})));
 }
 
-function renderStats(dump) {
-  if (!dump) { $('stats').textContent = ''; return; }
-  const c = (dump.cookies?.byUrl?.length || 0) + (dump.cookies?.byDomain?.length || 0);
-  const ls = Object.keys(dump.localStorage || {}).length;
-  const ss = Object.keys(dump.sessionStorage || {}).length;
-  const rq = (dump.capturedRequests || []).length;
-  $('stats').innerHTML =
-    `Cookies: <b>${c}</b> · localStorage: <b>${ls}</b> · sessionStorage: <b>${ss}</b> · Запросов: <b>${rq}</b>`;
+function readCookies() {
+  return new Promise((res) => chrome.cookies.getAll({ domain: "deepseek.com" }, (c) => res(c || [])));
 }
 
-function render(dump) {
-  $('preview').textContent = dump ? JSON.stringify(dump, null, 2) : '{ }';
-  renderStats(dump);
-  if (!dump) { setStatus('⚠️ Ещё ничего не собрано', 'warn'); return; }
-  const rq = (dump.capturedRequests || []).length;
-  if (rq > 0) setStatus(`✅ Собрано (${rq} сетевых записей) — ищи token/hif_* в capturedRequests`, 'ok');
-  else setStatus('⚠️ Запросы не перехвачены — перезагрузи вкладку и отправь сообщение', 'warn');
+async function build() {
+  const [dump, cookies] = await Promise.all([readDump(), readCookies()]);
+  return {
+    timestamp: new Date().toISOString(),
+    tabUrl: dump.url || "",
+    userAgent: dump.userAgent || "",
+    cookies: cookies.map((c) => ({
+      name: c.name,
+      value: c.value,
+      domain: c.domain,
+      path: c.path,
+      secure: c.secure,
+      httpOnly: c.httpOnly,
+      sameSite: c.sameSite,
+      session: c.session,
+      expirationDate: c.expirationDate || null
+    })),
+    localStorage: dump.localStorage || {},
+    sessionStorage: dump.sessionStorage || {},
+    capturedRequests: dump.capturedRequests || []
+  };
 }
 
-function load() {
-  chrome.runtime.sendMessage({ action: 'getDump' }, (r) => {
-    render(r?.dump || null);
-  });
+function renderStats(d) {
+  $("stats").innerHTML =
+    "Cookies: <b>" + d.cookies.length + "</b>" +
+    " · localStorage: <b>" + Object.keys(d.localStorage).length + "</b>" +
+    " · sessionStorage: <b>" + Object.keys(d.sessionStorage).length + "</b>" +
+    " · Запросов: <b>" + d.capturedRequests.length + "</b>";
 }
 
-$('btnCollect').addEventListener('click', () => {
-  setStatus('⏳ Собираю...', 'warn');
-  chrome.runtime.sendMessage({ action: 'collect' }, (r) => {
-    if (r?.success) render(r.dump);
-    else setStatus('❌ ' + (r?.error || 'Ошибка'), 'err');
+async function render() {
+  const d = await build();
+  $("preview").textContent = JSON.stringify(d, null, 2);
+  renderStats(d);
+  if (d.capturedRequests.length > 0) {
+    $("status").textContent = "✅ Собрано (" + d.capturedRequests.length + " сетевых записей)";
+    $("status").className = "status ok";
+  } else if (d.localStorage && Object.keys(d.localStorage).length > 0) {
+    $("status").textContent = "⚠️ Storage собран, но запросы ещё не ловились. Отправь сообщение в чате.";
+    $("status").className = "status warn";
+  } else {
+    $("status").textContent = "⏳ Пока пусто. Перезагрузи вкладку DeepSeek и отправь сообщение.";
+    $("status").className = "status warn";
+  }
+}
+
+$("btnRefresh").addEventListener("click", render);
+
+$("btnClear").addEventListener("click", () => {
+  chrome.tabs.query({ url: "https://chat.deepseek.com/*" }, (tabs) => {
+    if (!tabs.length) { render(); return; }
+    chrome.tabs.sendMessage(tabs[0].id, { action: "clearCaptured" }, () => {
+      setTimeout(render, 300);
+    });
   });
 });
 
-$('btnClear').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ action: 'clearCaptured' }, () => {
-    setStatus('🧹 Лог перехвата очищен. Отправь сообщение в чате и нажми "Собрать" заново.', 'warn');
+$("btnCopy").addEventListener("click", () => {
+  navigator.clipboard.writeText($("preview").textContent).then(() => {
+    $("btnCopy").textContent = "✅ Скопировано";
+    setTimeout(() => $("btnCopy").textContent = "📋 Копировать", 1200);
   });
 });
 
-$('btnCopy').addEventListener('click', () => {
-  navigator.clipboard.writeText($('preview').textContent).then(() => {
-    const b = $('btnCopy'); b.textContent = '✅ Скопировано';
-    setTimeout(() => (b.textContent = '📋 Копировать'), 1200);
-  });
-});
-
-$('btnSave').addEventListener('click', () => {
-  const blob = new Blob([$('preview').textContent], { type: 'application/json' });
-  const a = document.createElement('a');
+$("btnSave").addEventListener("click", () => {
+  const blob = new Blob([$("preview").textContent + "\n"], { type: "application/json" });
+  const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
-  a.download = `deepseek-dump-${Date.now()}.json`;
+  a.download = "deepseek-dump-" + Date.now() + ".json";
   a.click();
   URL.revokeObjectURL(a.href);
 });
 
-load();
+render();
+setInterval(render, 1500);
