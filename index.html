@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FreeDeepseekAPI в Termux — Полная инструкция</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1218;
+    --panel: #161b22;
+    --panel-2: #1c232c;
+    --border: #2a3340;
+    --text: #d0d7de;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --warn: #f0883e;
+    --danger: #f85149;
+    --code-bg: #0b0f14;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    font-size: 15px;
+    padding: 0 0 60px;
+  }
+  header {
+    background: linear-gradient(135deg, #1a2332 0%, #0f1218 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 40px 24px 30px;
+    text-align: center;
+  }
+  header h1 { font-size: 26px; color: var(--accent); margin-bottom: 10px; font-weight: 700; }
+  header p { color: var(--muted); font-size: 14px; max-width: 700px; margin: 0 auto; }
+  .badges { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .badge {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 11px;
+    color: var(--accent-2);
+  }
+  main { max-width: 900px; margin: 0 auto; padding: 30px 20px; }
+  nav.toc {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 22px;
+    margin-bottom: 30px;
+  }
+  nav.toc h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--muted); margin-bottom: 12px; }
+  nav.toc ol { list-style: none; counter-reset: item; }
+  nav.toc li { counter-increment: item; margin: 6px 0; }
+  nav.toc li::before { content: counter(item) ". "; color: var(--accent); font-weight: 600; }
+  nav.toc a { color: var(--text); text-decoration: none; transition: color .15s; }
+  nav.toc a:hover { color: var(--accent); text-decoration: underline; }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 22px;
+    margin-bottom: 22px;
+  }
+  section h2 {
+    font-size: 20px;
+    color: var(--accent);
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section h2 .num {
+    background: var(--accent);
+    color: #0f1218;
+    width: 28px; height: 28px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  section h3 { font-size: 15px; color: var(--accent-2); margin: 20px 0 10px; }
+  section p { margin-bottom: 12px; }
+  section ul, section ol { margin: 10px 0 14px 22px; }
+  section li { margin: 5px 0; }
+  code {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 6px;
+    font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+    font-size: 13px;
+    color: var(--accent-2);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    overflow-x: auto;
+    margin: 10px 0 16px;
+    font-family: 'SF Mono', Consolas, 'Courier New', monospace;
+    font-size: 12.5px;
+    line-height: 1.5;
+    color: #c9d1d9;
+  }
+  pre code { background: none; border: none; padding: 0; color: inherit; font-size: inherit; }
+  .callout {
+    border-left: 4px solid;
+    border-radius: 6px;
+    padding: 12px 16px;
+    margin: 14px 0;
+    font-size: 14px;
+  }
+  .callout.info { border-color: var(--accent); background: rgba(88,166,255,.08); }
+  .callout.warn { border-color: var(--warn); background: rgba(240,136,62,.08); }
+  .callout.danger { border-color: var(--danger); background: rgba(248,81,73,.08); }
+  .callout.ok { border-color: var(--accent-2); background: rgba(126,231,135,.08); }
+  .callout b { color: #fff; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 16px;
+    font-size: 13.5px;
+  }
+  th, td { border: 1px solid var(--border); padding: 9px 12px; text-align: left; vertical-align: top; }
+  th { background: var(--panel-2); color: var(--accent); font-weight: 600; }
+  tr:nth-child(even) td { background: rgba(255,255,255,.015); }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 30px 20px 0;
+    margin-top: 20px;
+    border-top: 1px solid var(--border);
+  }
+  .top {
+    position: fixed;
+    bottom: 20px; right: 20px;
+    background: var(--accent);
+    color: #0f1218;
+    width: 42px; height: 42px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    text-decoration: none;
+    font-size: 20px;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(0,0,0,.5);
+  }
+  .top:hover { background: #79b8ff; }
+  @media (max-width: 600px) {
+    header h1 { font-size: 20px; }
+    section { padding: 18px 14px; }
+    section h2 { font-size: 17px; }
+    pre { font-size: 11.5px; padding: 12px; }
+    table { font-size: 12px; }
+    th, td { padding: 7px 9px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔓 FreeDeepseekAPI в Termux</h1>
+  <p>Полная инструкция: установка, авторизация через расширение Chrome, копирование auth-файла и запуск OpenAI-совместимого API.</p>
+  <div class="badges">
+    <span class="badge">DeepSeek Web Chat</span>
+    <span class="badge">OpenAI API</span>
+    <span class="badge">Anthropic API</span>
+    <span class="badge">Streaming</span>
+    <span class="badge">Tool Calling</span>
+    <span class="badge">Zero npm deps</span>
+  </div>
+</header>
+
+<main>
+
+<nav class="toc">
+  <h3>Содержание</h3>
+  <ol>
+    <li><a href="#s1">Подготовка Termux</a></li>
+    <li><a href="#s2">Клонирование репозитория</a></li>
+    <li><a href="#s3">Установка расширения Chrome</a></li>
+    <li><a href="#s4">Получение auth-файла</a></li>
+    <li><a href="#s5">Копирование auth-файла в Termux</a></li>
+    <li><a href="#s6">Запуск сервера</a></li>
+    <li><a href="#s7">Использование API</a></li>
+    <li><a href="#s8">Управление сервером</a></li>
+    <li><a href="#s9">Возможные проблемы</a></li>
+  </ol>
+</nav>
+
+<!-- ШАГ 1 -->
+<section id="s1">
+  <h2><span class="num">1</span> Подготовка Termux</h2>
+  <p>Откройте Termux и установите необходимое:</p>
+  <pre><code>pkg update &amp;&amp; pkg upgrade -y
+pkg install nodejs-lts git curl -y
+node -v</code></pre>
+  <p>Убедитесь, что Node.js версии <b>18 или выше</b>. Если ниже — обновите:</p>
+  <pre><code>pkg install nodejs-lts</code></pre>
+  <div class="callout info">
+    <b>Примечание:</b> FreeDeepseekAPI не имеет npm-зависимостей, поэтому <code>npm install</code> не требуется. Проект работает «из коробки» на Node.js 18+.
+  </div>
+</section>
+
+<!-- ШАГ 2 -->
+<section id="s2">
+  <h2><span class="num">2</span> Клонирование репозитория</h2>
+  <p>Клонируйте ваш форк:</p>
+  <pre><code>cd ~
+git clone https://github.com/eldevex/FreeDeepseekAPI.git
+cd FreeDeepseekAPI</code></pre>
+  <p>Проверьте, что всё на месте:</p>
+  <pre><code>ls -la</code></pre>
+  <p>Вы должны увидеть <code>package.json</code>, <code>index.js</code>, папку <code>lib/</code> и другие файлы.</p>
+</section>
+
+<!-- ШАГ 3 -->
+<section id="s3">
+  <h2><span class="num">3</span> Установка расширения Chrome</h2>
+  <p>Для получения auth-файла используется расширение <b>deepseek-auth-exporter</b> из вашего репозитория. Его нужно установить в браузер на компьютере (или в браузер на телефоне, поддерживающий расширения Chrome, например Kiwi Browser).</p>
+
+  <h3>3.1 Скачайте расширение</h3>
+  <p>Вариант А — через <code>git</code> (если у вас есть Git на компьютере):</p>
+  <pre><code>git clone https://github.com/eldevex/FreeDeepseekAPI.git
+# Расширение находится в папке:
+# FreeDeepseekAPI/chromium-extensions/deepseek-auth-exporter</code></pre>
+  <p>Вариант Б — скачайте ZIP-архив репозитория и распакуйте его. Папка расширения — <code>chromium-extensions/deepseek-auth-exporter</code>.</p>
+
+  <h3>3.2 Загрузите расширение в Chrome</h3>
+  <ol>
+    <li>Откройте <code>chrome://extensions</code>.</li>
+    <li>Включите <b>Режим разработчика</b> (переключатель справа вверху).</li>
+    <li>Нажмите <b>Загрузить распакованное расширение</b>.</li>
+    <li>Укажите папку <code>deepseek-auth-exporter</code>.</li>
+    <li>Расширение появится в списке. Закрепите его на панели.</li>
+  </ol>
+  <div class="callout warn">
+    <b>Важно:</b> расширение работает только на <code>chat.deepseek.com</code>. Убедитесь, что вы вошли в свой аккаунт DeepSeek в этом браузере.
+  </div>
+</section>
+
+<!-- ШАГ 4 -->
+<section id="s4">
+  <h2><span class="num">4</span> Получение auth-файла</h2>
+  <p>Откройте <code>https://chat.deepseek.com</code> и войдите в аккаунт.</p>
+  <ol>
+    <li>Нажмите на иконку расширения <b>DeepSeek Auth Exporter</b>.</li>
+    <li>Нажмите кнопку <b>Collect from Tab</b> (Собрать со вкладки).</li>
+    <li>Расширение соберёт токен, cookie, <code>hif_dliq</code>, <code>hif_leim</code> и покажет превью JSON.</li>
+    <li>Нажмите <b>Download File</b> (Скачать файл) — сохранится <code>deepseek-auth.json</code>.</li>
+  </ol>
+  <div class="callout info">
+    <b>Если каких-то полей не хватает:</b> перезагрузите вкладку DeepSeek (F5), отправьте сообщение в чате (например, «ok») и снова нажмите <b>Collect from Tab</b>.
+  </div>
+  <div class="callout danger">
+    <b>Безопасность:</b> файл <code>deepseek-auth.json</code> содержит доступ к вашему аккаунту DeepSeek. Не публикуйте его и не передавайте третьим лицам.
+  </div>
+</section>
+
+<!-- ШАГ 5 -->
+<section id="s5">
+  <h2><span class="num">5</span> Копирование auth-файла в Termux</h2>
+  <p>После скачивания файл окажется в папке загрузок. Скопируйте его в проект:</p>
+  <pre><code>cp ~/storage/downloads/deepseek-auth.json ~/FreeDeepseekAPI/deepseek-auth.json</code></pre>
+  <p>Если файл называется иначе (например, <code>deepseek-auth (1).json</code>):</p>
+  <pre><code>cp ~/storage/downloads/deepseek-auth*.json ~/FreeDeepseekAPI/deepseek-auth.json</code></pre>
+  <p>Проверьте, что файл на месте:</p>
+  <pre><code>ls -la ~/FreeDeepseekAPI/deepseek-auth.json</code></pre>
+  <div class="callout info">
+    <b>Если папка <code>~/storage/downloads</code> не существует:</b> выполните <code>termux-setup-storage</code> и подтвердите доступ к файлам.
+  </div>
+</section>
+
+<!-- ШАГ 6 -->
+<section id="s6">
+  <h2><span class="num">6</span> Запуск сервера</h2>
+  <p>Перейдите в папку проекта и запустите:</p>
+  <pre><code>cd ~/FreeDeepseekAPI
+npm start</code></pre>
+  <p>Появится меню:</p>
+  <pre><code>1 — authorize / refresh the DeepSeek login
+2 — show models and statuses
+3 — start the proxy
+4 — exit</code></pre>
+  <p>Введите <b>3</b> и нажмите Enter. Сервер запустится на <code>http://localhost:9655</code>.</p>
+  <p>Для запуска без меню (в фоне):</p>
+  <pre><code>NON_INTERACTIVE=1 npm start</code></pre>
+  <p>Или с автоматическим выбором прокси:</p>
+  <pre><code>SKIP_ACCOUNT_MENU=1 npm start</code></pre>
+  <div class="callout ok">
+    <b>Сервер работает.</b> Не закрывайте это окно Termux — прокси должен оставаться запущенным.
+  </div>
+</section>
+
+<!-- ШАГ 7 -->
+<section id="s7">
+  <h2><span class="num">7</span> Использование API</h2>
+
+  <h3>7.1 Проверка здоровья</h3>
+  <pre><code>curl http://localhost:9655/health</code></pre>
+  <p>Должен вернуться JSON со статусом <code>ok</code>.</p>
+
+  <h3>7.2 Список моделей</h3>
+  <pre><code>curl http://localhost:9655/v1/models</code></pre>
+
+  <h3>7.3 Chat Completions (OpenAI-совместимый)</h3>
+  <pre><code>curl -X POST http://localhost:9655/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-chat",
+    "messages": [{"role": "user", "content": "Привет!"}]
+  }'</code></pre>
+
+  <h3>7.4 Streaming</h3>
+  <pre><code>curl -N -X POST http://localhost:9655/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-chat",
+    "stream": true,
+    "messages": [{"role": "user", "content": "Считай до 5"}]
+  }'</code></pre>
+
+  <h3>7.5 Anthropic Messages API (shim)</h3>
+  <pre><code>curl -X POST http://localhost:9655/v1/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-chat",
+    "max_tokens": 100,
+    "messages": [{"role": "user", "content": "Привет!"}]
+  }'</code></pre>
+
+  <h3>7.6 OpenAI Responses API (shim)</h3>
+  <pre><code>curl -X POST http://localhost:9655/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "deepseek-chat",
+    "input": "Привет!"
+  }'</code></pre>
+
+  <h3>7.7 Подключение клиентов</h3>
+  <table>
+    <tr><th>Поле</th><th>Значение</th></tr>
+    <tr><td>Base URL</td><td><code>http://localhost:9655/v1</code></td></tr>
+    <tr><td>API Key</td><td><code>sk-any</code> (любой, если не задан <code>PROXY_API_KEY</code>)</td></tr>
+    <tr><td>Model</td><td><code>deepseek-chat</code>, <code>deepseek-reasoner</code> и др.</td></tr>
+  </table>
+  <p>Пример для Python SDK:</p>
+  <pre><code>from openai import OpenAI
+client = OpenAI(base_url="http://localhost:9655/v1", api_key="sk-any")
+resp = client.chat.completions.create(
+    model="deepseek-chat",
+    messages=[{"role": "user", "content": "Привет!"}]
+)
+print(resp.choices[0].message.content)</code></pre>
+</section>
+
+<!-- ШАГ 8 -->
+<section id="s8">
+  <h2><span class="num">8</span> Управление сервером</h2>
+  <table>
+    <tr><th>Действие</th><th>Команда</th></tr>
+    <tr><td>Остановить</td><td><code>Ctrl+C</code> в окне сервера</td></tr>
+    <tr><td>Запустить в фоне</td><td><code>NON_INTERACTIVE=1 npm start &amp;</code></td></tr>
+    <tr><td>Перезапустить</td><td><code>pkill -f "node index.js"; sleep 1; NON_INTERACTIVE=1 npm start &amp;</code></td></tr>
+    <tr><td>Проверить статус</td><td><code>pgrep -af "node index.js"</code></td></tr>
+    <tr><td>Сеть (доступ с других устройств)</td><td><code>HOST=0.0.0.0 PROXY_API_KEY='long-random-key' npm start</code></td></tr>
+  </table>
+  <div class="callout warn">
+    <b>Важно:</b> по умолчанию сервер слушает только <code>127.0.0.1</code>. Чтобы открыть доступ по локальной сети, задайте <code>HOST=0.0.0.0</code> и <b>обязательно</b> <code>PROXY_API_KEY</code> — иначе любой в вашей Wi-Fi сможет пользоваться вашим аккаунтом DeepSeek.
+  </div>
+</section>
+
+<!-- ШАГ 9 -->
+<section id="s9">
+  <h2><span class="num">9</span> Возможные проблемы</h2>
+  <table>
+    <tr><th>Проблема</th><th>Решение</th></tr>
+    <tr>
+      <td><code>deepseek-auth.json</code> не найден</td>
+      <td>Убедитесь, что файл скопирован в корень проекта: <code>ls ~/FreeDeepseekAPI/deepseek-auth.json</code></td>
+    </tr>
+    <tr>
+      <td>Ошибка авторизации <code>401</code></td>
+      <td>Токен истёк. Получите свежий auth-файл через расширение и скопируйте заново.</td>
+    </tr>
+    <tr>
+      <td><code>npm start</code> зависает на меню</td>
+      <td>Используйте <code>NON_INTERACTIVE=1 npm start</code> или <code>SKIP_ACCOUNT_MENU=1 npm start</code>.</td>
+    </tr>
+    <tr>
+      <td>Порт 9655 занят</td>
+      <td>Убейте старый процесс: <code>pkill -f "node index.js"</code>, затем запустите снова.</td>
+    </tr>
+    <tr>
+      <td>Расширение не собирает данные</td>
+      <td>Перезагрузите вкладку DeepSeek, отправьте сообщение в чате, затем снова нажмите <b>Collect from Tab</b>.</td>
+    </tr>
+  </table>
+  <div class="callout ok">
+    <b>Готово!</b> Если что-то не заработает — проверьте <code>npm start</code> в переднем плане (без <code>NON_INTERACTIVE</code>), там будет видна причина.
+  </div>
+</section>
+
+</main>
+
+<a href="#" class="top" title="Наверх">↑</a>
+
+<footer>
+  Инструкция для Termux · FreeDeepseekAPI (форк eldevex) · 2026
+</footer>
+
+</body>
+</html>
